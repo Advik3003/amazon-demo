@@ -1,0 +1,45 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: order-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/order_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/order_read_db
+
+springdoc:
+  api-docs:
+    path: /order-service/api-docs
+
+# Kafka topics
+app:
+  kafka:
+    topics:
+      order-events: order-events
+      payment-events: payment-events
+
+  # Resilience4j Circuit Breaker config for external calls
+  resilience4j:
+    circuit-breaker:
+      instances:
+        inventory-service:
+          slidingWindowSize: 10
+          failureRateThreshold: 50
+          waitDurationInOpenState: 30s
+
+logging:
+  level:
+    com.amazondemo.order: DEBUG

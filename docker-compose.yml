@@ -1,0 +1,492 @@
+version: '3.8'
+
+# ============================================================
+# AMAZON DEMO - DOCKER COMPOSE
+# ============================================================
+# Complete local development environment.
+# All services, databases, and infrastructure in one file.
+#
+# HOW TO USE:
+#   docker compose up -d                    # Start all services
+#   docker compose up -d postgres kafka     # Start only dependencies
+#   docker compose logs -f auth-service    # Follow a service's logs
+#   docker compose down                     # Stop everything
+#   docker compose down -v                  # Stop + remove volumes
+#
+# STARTUP ORDER (important!):
+# 1. Infrastructure (postgres, mongo, redis, kafka, rabbitmq)
+# 2. Config Server
+# 3. Discovery Server (Eureka)
+# 4. All Microservices
+# 5. API Gateway (last)
+#
+# SERVICE PORTS:
+#   API Gateway:       8080
+#   Auth Service:      8081
+#   User Service:      8082
+#   Product Service:   8083
+#   Inventory Service: 8084
+#   Order Service:     8085
+#   Payment Service:   8086
+#   Notification:      8087
+#   Batch Service:     8088
+#   Config Server:     8888
+#   Eureka Dashboard:  8761
+#   PostgreSQL:        5432
+#   MongoDB:           27017
+#   Redis:             6379
+#   Kafka:             9092
+#   RabbitMQ:          5672 (AMQP), 15672 (Management UI)
+#   Zipkin:            9411
+#   LocalStack:        4566
+#   Mailhog:           8025 (UI), 1025 (SMTP)
+# ============================================================
+
+networks:
+  amazon-demo-network:
+    driver: bridge
+    name: amazon-demo-network
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+  localstack_data:
+
+services:
+
+  # ==================== INFRASTRUCTURE ====================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: amazon-demo-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_MULTIPLE_DATABASES: auth_db,user_db,product_db,inventory_db,order_db,payment_db,batch_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:7.0
+    container_name: amazon-demo-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: amazon-demo-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: amazon-demo-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/data
+    ports:
+      - "2181:2181"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: amazon-demo-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      - "9092:9092"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: amazon-demo-kafka-ui
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: amazon-demo
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "8090:8080"
+    networks:
+      - amazon-demo-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: amazon-demo-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Management UI
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # Zipkin - Distributed Tracing UI
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: amazon-demo-zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - amazon-demo-network
+
+  # LocalStack - AWS Services Mock (S3, SQS, etc.)
+  localstack:
+    image: localstack/localstack:3.4
+    container_name: amazon-demo-localstack
+    environment:
+      SERVICES: s3,sqs,sns
+      DEBUG: 0
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./infrastructure/localstack/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
+    ports:
+      - "4566:4566"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Mailhog - Email testing (catch all emails in dev)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: amazon-demo-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI - visit http://localhost:8025
+    networks:
+      - amazon-demo-network
+
+  # ==================== SPRING SERVICES ====================
+
+  config-server:
+    build:
+      context: ./backend/config-server
+      dockerfile: Dockerfile
+    container_name: amazon-demo-config-server
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      SERVER_PORT: 8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8888:8888"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8888/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  discovery-server:
+    build:
+      context: ./backend/discovery-server
+      dockerfile: Dockerfile
+    container_name: amazon-demo-discovery-server
+    depends_on:
+      config-server:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8761
+    ports:
+      - "8761:8761"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://admin:admin123@localhost:8761/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+      SPRING_DATA_REDIS_HOST: redis
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    ports:
+      - "8081:8081"
+    networks:
+      - amazon-demo-network
+
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8082:8082"
+    networks:
+      - amazon-demo-network
+
+  product-service:
+    build:
+      context: ./backend/product-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-product-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/product_db
+      SPRING_DATA_MONGODB_URI: mongodb://admin:admin123@mongo:27017/product_read_db?authSource=admin
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8083:8083"
+    networks:
+      - amazon-demo-network
+
+  inventory-service:
+    build:
+      context: ./backend/inventory-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-inventory-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inventory_db
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8084:8084"
+    networks:
+      - amazon-demo-network
+
+  order-service:
+    build:
+      context: ./backend/order-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-order-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_db
+      SPRING_DATA_MONGODB_URI: mongodb://admin:admin123@mongo:27017/order_read_db?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8085:8085"
+    networks:
+      - amazon-demo-network
+
+  payment-service:
+    build:
+      context: ./backend/payment-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-payment-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8086:8086"
+    networks:
+      - amazon-demo-network
+
+  notification-service:
+    build:
+      context: ./backend/notification-service
+      dockerfile: Dockerfile
+    container_name: amazon-demo-notification-service
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://admin:admin123@mongo:27017/notification_db?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_MAIL_HOST: mailhog
+      SPRING_MAIL_PORT: 1025
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+    ports:
+      - "8087:8087"
+    networks:
+      - amazon-demo-network
+
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: amazon-demo-api-gateway
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    ports:
+      - "8080:8080"
+    networks:
+      - amazon-demo-network
+
+  # ==================== FRONTEND ====================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: amazon-demo-frontend
+    ports:
+      - "3000:80"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+    depends_on:
+      - api-gateway
+    networks:
+      - amazon-demo-network

@@ -1,0 +1,49 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: discovery-server
+  # Disable config server import requirement (discovery-server is self-contained)
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+  config:
+    import: "optional:configserver:"
+  # Security for Eureka dashboard
+  security:
+    user:
+      name: admin
+      password: admin123
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    # Don't register with itself or fetch registry from itself
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8761/eureka/
+  server:
+    # Disable strict evaluation for development (reduces noise)
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"

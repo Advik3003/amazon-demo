@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: product-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    config:
+      fail-fast: false
+
+server:
+  port: 8083
+
+spring.datasource:
+  url: jdbc:postgresql://localhost:5432/product_db
+  username: postgres
+  password: postgres
+  driver-class-name: org.postgresql.Driver
+
+spring.jpa:
+  hibernate:
+    ddl-auto: update
+  show-sql: false
+
+spring.data.mongodb:
+  uri: mongodb://localhost:27017/product_read_db
+
+spring.data.redis:
+  host: localhost
+  port: 6379
+
+spring.kafka:
+  bootstrap-servers: localhost:9092
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  consumer:
+    key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    auto-offset-reset: earliest
+    properties:
+      spring.json.trusted.packages: "com.amazondemo.*,java.util.*"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /product-service/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

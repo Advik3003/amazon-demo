@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: amazon-demo
+  labels:
+    name: amazon-demo
+    environment: local

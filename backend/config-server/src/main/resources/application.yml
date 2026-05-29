@@ -1,0 +1,49 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native  # 'native' means read from local filesystem (no Git needed for local dev)
+  cloud:
+    config:
+      server:
+        native:
+          # Path to the configuration files folder
+          search-locations: classpath:/config
+        # Uncomment for Git-based config (production use):
+        # git:
+        #   uri: https://github.com/your-org/amazon-demo-config
+        #   default-label: main
+        #   search-paths: '{application}'
+
+# Eureka - register config server for service discovery
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# Actuator endpoints for health monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh,env
+  endpoint:
+    health:
+      show-details: always
+  # Exclude Eureka from health check so config-server is healthy even before Eureka starts
+  health:
+    discovery-client:
+      enabled: false
+
+# Logging
+logging:
+  level:
+    com.amazondemo: DEBUG
+    org.springframework.cloud.config: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

@@ -1,0 +1,46 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+
+  # PostgreSQL for auth/user credentials
+  datasource:
+    url: jdbc:postgresql://localhost:5432/auth_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update  # use 'validate' in production
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # Redis for token blacklisting and session cache
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+# Springdoc / Swagger
+springdoc:
+  api-docs:
+    path: /auth-service/api-docs
+  swagger-ui:
+    path: /auth-service/swagger-ui.html
+
+# Service-specific logging
+logging:
+  level:
+    com.amazondemo.auth: DEBUG

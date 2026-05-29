@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: amazon-demo
+  labels:
+    app: auth-service
+    version: "1.0.0"
+spec:
+  replicas: 2    # 2 instances for high availability
+  selector:
+    matchLabels:
+      app: auth-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # Zero-downtime deployment
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        version: "1.0.0"
+    spec:
+      containers:
+        - name: auth-service
+          image: amazon-demo/auth-service:latest
+          imagePullPolicy: Never  # Use local image for development
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://$(POSTGRES_HOST):5432/auth_db"
+            - name: SPRING_DATA_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: amazon-demo-config
+                  key: REDIS_HOST
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: amazon-demo-config
+                  key: EUREKA_SERVER_URL
+          envFrom:
+            - configMapRef:
+                name: amazon-demo-config
+            - secretRef:
+                name: amazon-demo-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # Liveness probe: Is the container alive? (restart if fails)
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Readiness probe: Is the container ready to receive traffic?
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service-service
+  namespace: amazon-demo
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+  type: ClusterIP  # Internal only (API Gateway handles external access)

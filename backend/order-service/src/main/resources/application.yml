@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: order-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    config:
+      fail-fast: false
+
+server:
+  port: 8085
+
+spring.datasource:
+  url: jdbc:postgresql://localhost:5432/order_db
+  username: postgres
+  password: postgres
+
+spring.jpa:
+  hibernate:
+    ddl-auto: update
+  show-sql: false
+
+spring.data.mongodb:
+  uri: mongodb://localhost:27017/order_read_db
+
+spring.data.redis:
+  host: localhost
+  port: 6379
+
+spring.kafka:
+  bootstrap-servers: localhost:9092
+  producer:
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+spring.rabbitmq:
+  host: localhost
+  port: 5672
+  username: guest
+  password: guest
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+  circuitbreaker:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      inventory-service:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  api-docs:
+    path: /order-service/api-docs

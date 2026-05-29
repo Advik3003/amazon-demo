@@ -1,0 +1,150 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # Global CORS configuration
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:3000"     # React dev server
+              - "http://localhost:5173"     # Vite dev server
+              - "http://localhost:4200"     # Angular (if used)
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      # Route definitions - maps incoming requests to services
+      routes:
+        # Auth Service routes
+        - id: auth-service
+          uri: lb://auth-service    # lb:// = load balanced via Eureka
+          predicates:
+            - Path=/api/v1/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: auth-service
+                fallbackUri: forward:/fallback/auth
+
+        # User Service routes
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/v1/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: user-service
+                fallbackUri: forward:/fallback/user
+
+        # Product Service routes
+        - id: product-service
+          uri: lb://product-service
+          predicates:
+            - Path=/api/v1/products/**, /api/v1/categories/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: product-service
+                fallbackUri: forward:/fallback/product
+
+        # Inventory Service routes
+        - id: inventory-service
+          uri: lb://inventory-service
+          predicates:
+            - Path=/api/v1/inventory/**
+
+        # Order Service routes
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/v1/orders/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: order-service
+                fallbackUri: forward:/fallback/order
+
+        # Payment Service routes
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/v1/payments/**
+
+        # Notification Service routes
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/v1/notifications/**
+
+      # Default filters applied to all routes
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
+# Resilience4j Circuit Breaker for API Gateway
+resilience4j:
+  circuitbreaker:
+    instances:
+      auth-service:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+      product-service:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+      order-service:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+      user-service:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+
+# Rate Limiting config
+app:
+  rate-limit:
+    default-replenish-rate: 100   # tokens per second
+    default-burst-capacity: 200   # max burst
+    auth-replenish-rate: 20       # stricter for auth endpoints
+    auth-burst-capacity: 40
+
+# JWT validation in gateway
+  jwt:
+    secret: "amazondemo-super-secret-jwt-key-change-in-production-min-256-bits"
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: auth-service
+        url: /auth-service/api-docs
+      - name: user-service
+        url: /user-service/api-docs
+      - name: product-service
+        url: /product-service/api-docs
+      - name: order-service
+        url: /order-service/api-docs
+      - name: payment-service
+        url: /payment-service/api-docs
+      - name: inventory-service
+        url: /inventory-service/api-docs
+
+logging:
+  level:
+    com.amazondemo.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO

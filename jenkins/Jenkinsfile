@@ -1,0 +1,245 @@
+/**
+ * Jenkins CI/CD Pipeline for Amazon Demo
+ * ========================================
+ * This pipeline automates:
+ * 1. Code checkout
+ * 2. Build (Maven)
+ * 3. Unit Tests
+ * 4. Integration Tests
+ * 5. Static Code Analysis (SonarQube)
+ * 6. Docker Image Build
+ * 7. Docker Image Push to Registry
+ * 8. Deploy to staging/production
+ *
+ * PIPELINE STAGES:
+ * Checkout -> Build -> Test -> Analyze -> Docker Build -> Push -> Deploy
+ *
+ * TRIGGERS:
+ * - Push to main branch: Full pipeline
+ * - Push to feature/* branches: Build + Test only
+ * - Pull Request: Build + Test + Code Analysis
+ *
+ * HOW TO USE:
+ * 1. Create a new Jenkins Pipeline job
+ * 2. Select "Pipeline script from SCM"
+ * 3. Point to this Jenkinsfile
+ */
+
+pipeline {
+    agent any
+
+    // Tools configured in Jenkins global configuration
+    tools {
+        maven 'Maven 3.9'
+        jdk 'Java 17'
+        nodejs 'Node 22'
+    }
+
+    // Pipeline environment variables
+    environment {
+        DOCKER_REGISTRY = 'your-registry.azurecr.io'  // Azure Container Registry
+        IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT?.take(7)}"
+        MAVEN_OPTS = '-Xmx1024m'
+        SONAR_PROJECT_KEY = 'amazon-demo'
+    }
+
+    options {
+        // Keep only last 10 builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        // Timeout entire pipeline after 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+        // Don't allow concurrent builds of the same branch
+        disableConcurrentBuilds()
+        // Timestamps in logs
+        timestamps()
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                echo "Building commit: ${env.GIT_COMMIT}"
+                echo "Branch: ${env.GIT_BRANCH}"
+            }
+        }
+
+        stage('Build Backend') {
+            steps {
+                dir('backend') {
+                    sh 'mvn clean compile -q'
+                }
+            }
+            post {
+                failure {
+                    echo "Build FAILED! Check the compilation errors above."
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                dir('backend') {
+                    sh 'mvn test -q'
+                }
+            }
+            post {
+                always {
+                    // Publish JUnit test results
+                    junit 'backend/**/target/surefire-reports/*.xml'
+                }
+                failure {
+                    echo "Unit tests FAILED!"
+                }
+            }
+        }
+
+        stage('Build Frontend') {
+            when {
+                // Only on main/develop branches or PRs
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    changeRequest()
+                }
+            }
+            steps {
+                dir('frontend') {
+                    sh 'npm ci'
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Code Analysis') {
+            when {
+                branch 'main'
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    dir('backend') {
+                        sh """
+                            mvn sonar:sonar \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                -Dsonar.sources=. \
+                                -q
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                dir('backend') {
+                    sh 'mvn package -DskipTests -q'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                script {
+                    def services = ['auth-service', 'user-service', 'product-service',
+                                   'inventory-service', 'order-service', 'payment-service',
+                                   'notification-service', 'batch-service', 'api-gateway',
+                                   'config-server', 'discovery-server']
+
+                    services.each { service ->
+                        echo "Building Docker image for: ${service}"
+                        sh """
+                            docker build \
+                                -t ${DOCKER_REGISTRY}/amazon-demo-${service}:${IMAGE_TAG} \
+                                -t ${DOCKER_REGISTRY}/amazon-demo-${service}:latest \
+                                -f backend/${service}/Dockerfile \
+                                backend/${service}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            when {
+                branch 'main'
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-registry-credentials',
+                    usernameVariable: 'REGISTRY_USER',
+                    passwordVariable: 'REGISTRY_PASSWORD'
+                )]) {
+                    sh "docker login ${DOCKER_REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_PASSWORD}"
+
+                    script {
+                        def services = ['auth-service', 'user-service', 'product-service',
+                                       'api-gateway', 'order-service', 'payment-service']
+                        services.each { service ->
+                            sh "docker push ${DOCKER_REGISTRY}/amazon-demo-${service}:${IMAGE_TAG}"
+                            sh "docker push ${DOCKER_REGISTRY}/amazon-demo-${service}:latest"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                echo "Deploying to staging environment..."
+                sh """
+                    kubectl config use-context staging
+                    kubectl set image deployment/auth-service auth-service=${DOCKER_REGISTRY}/amazon-demo-auth-service:${IMAGE_TAG} -n amazon-demo
+                    kubectl rollout status deployment/auth-service -n amazon-demo
+                """
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            // Require manual approval before production deployment
+            input {
+                message "Deploy to production?"
+                ok "Deploy"
+                parameters {
+                    string(name: 'REASON', description: 'Reason for deployment')
+                }
+            }
+            steps {
+                echo "Deploying to production... Reason: ${REASON}"
+                sh """
+                    kubectl config use-context production
+                    kubectl set image deployment/auth-service auth-service=${DOCKER_REGISTRY}/amazon-demo-auth-service:${IMAGE_TAG} -n amazon-demo
+                    kubectl rollout status deployment/auth-service -n amazon-demo
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline SUCCESS! Build: ${env.BUILD_NUMBER}"
+            // Slack notification (uncomment when configured)
+            // slackSend color: 'good', message: "Build SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+        failure {
+            echo "Pipeline FAILED! Build: ${env.BUILD_NUMBER}"
+            // slackSend color: 'danger', message: "Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+        }
+        always {
+            // Clean up Docker images to save disk space
+            sh "docker image prune -f || true"
+            cleanWs()
+        }
+    }
+}

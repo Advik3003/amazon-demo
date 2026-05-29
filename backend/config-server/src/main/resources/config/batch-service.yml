@@ -1,0 +1,40 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: batch-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/batch_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # Spring Batch configuration
+  batch:
+    jdbc:
+      initialize-schema: always  # Creates Spring Batch metadata tables
+    job:
+      enabled: false  # Don't run jobs on startup (run on schedule only)
+
+springdoc:
+  api-docs:
+    path: /batch-service/api-docs
+
+# Batch job schedules (cron expressions)
+app:
+  batch:
+    order-report-cron: "0 0 1 * * ?"       # Daily at 1 AM
+    inventory-sync-cron: "0 */30 * * * ?"  # Every 30 minutes
+    cleanup-cron: "0 0 2 * * ?"            # Daily at 2 AM
+
+logging:
+  level:
+    com.amazondemo.batch: DEBUG
+    org.springframework.batch: INFO

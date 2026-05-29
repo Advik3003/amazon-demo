@@ -1,0 +1,31 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payment_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+springdoc:
+  api-docs:
+    path: /payment-service/api-docs
+
+# Dummy payment gateway config
+app:
+  payment:
+    success-rate: 0.9       # 90% success rate for simulation
+    processing-delay-ms: 1000  # Simulate payment processing time
+
+logging:
+  level:
+    com.amazondemo.payment: DEBUG

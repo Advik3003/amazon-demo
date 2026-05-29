@@ -1,0 +1,106 @@
+# ============================================================
+# GLOBAL CONFIG - applies to ALL microservices
+# ============================================================
+# This file is served by Config Server to all services.
+# Service-specific overrides go in their own files.
+
+spring:
+  # Jackson JSON configuration
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: NON_NULL
+
+  # Kafka - shared by all event-driven services
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all  # Wait for all replicas to confirm (data safety)
+      retries: 3
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.amazondemo.*"
+
+  # RabbitMQ - for payment and notification messages
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+
+  # Redis - shared cache configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+# Eureka - all services register here
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+# Actuator - health endpoints for Kubernetes readiness/liveness probes
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,env,refresh
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true  # Enables /actuator/health/liveness and /actuator/health/readiness
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# JWT Configuration - used by auth-service and api-gateway
+app:
+  jwt:
+    secret: "amazondemo-super-secret-jwt-key-change-in-production-min-256-bits"
+    access-token-expiry: 900000      # 15 minutes in milliseconds
+    refresh-token-expiry: 604800000  # 7 days in milliseconds
+
+  # App branding - configurable for white-label support
+  branding:
+    app-name: "Amazon Demo"
+    company-name: "Amazon Demo Inc."
+    support-email: "support@amazondemo.com"
+
+# Logging configuration
+logging:
+  level:
+    com.amazondemo: INFO
+    org.springframework.security: WARN
+    org.springframework.cloud: WARN
+  pattern:
+    # Structured logging format with correlationId from MDC
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{correlationId}] %-5level %logger{36} - %msg%n"

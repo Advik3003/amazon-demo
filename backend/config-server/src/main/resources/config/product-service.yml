@@ -1,0 +1,51 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: product-service
+
+  # PostgreSQL for product write operations (CQRS Command side)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/product_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # MongoDB for product read/search (CQRS Query side)
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/product_read_db
+
+springdoc:
+  api-docs:
+    path: /product-service/api-docs
+
+# Redis cache TTL settings
+app:
+  cache:
+    product-ttl: 300       # 5 minutes
+    category-ttl: 3600     # 1 hour
+    search-ttl: 60         # 1 minute
+
+  # Kafka topics
+  kafka:
+    topics:
+      product-events: product-events
+      inventory-events: inventory-events
+
+  # LocalStack S3 for product images
+  aws:
+    s3:
+      bucket-name: amazon-demo-uploads
+      product-images-prefix: product-images/
+      endpoint: http://localhost:4566
+
+logging:
+  level:
+    com.amazondemo.product: DEBUG

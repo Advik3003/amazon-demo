@@ -1,0 +1,37 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: notification-service
+
+  # MongoDB to store notification history
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/notification_db
+
+  # SMTP for email notifications (use Mailhog for local dev)
+  mail:
+    host: localhost
+    port: 1025  # Mailhog port
+    username: ""
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+springdoc:
+  api-docs:
+    path: /notification-service/api-docs
+
+app:
+  notification:
+    from-email: noreply@amazondemo.com
+    from-name: "Amazon Demo"
+
+logging:
+  level:
+    com.amazondemo.notification: DEBUG
