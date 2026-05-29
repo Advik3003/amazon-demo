@@ -23,6 +23,7 @@ spring.jpa:
 
 spring.data.mongodb:
   uri: mongodb://localhost:27017/product_read_db
+  auto-index-creation: true
 
 spring.data.redis:
   host: localhost

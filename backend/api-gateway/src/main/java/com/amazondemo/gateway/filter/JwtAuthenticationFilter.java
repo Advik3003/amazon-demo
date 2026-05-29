@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -48,6 +49,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     @Value("${app.jwt.secret:amazondemo-super-secret-jwt-key-change-in-production-min-256-bits}")
     private String jwtSecret;
+
+    private final ReactiveStringRedisTemplate redisTemplate;
+
+    public JwtAuthenticationFilter(ReactiveStringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     // Paths that don't require authentication
     private static final List<String> PUBLIC_PATHS = Arrays.asList(
@@ -102,19 +109,43 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             String email = claims.get("email", String.class);
             String roles = claims.get("roles", String.class);
 
-            log.debug("JWT validated for user: {} path: {} [correlationId={}]",
-                    userId, path, finalCorrelationId);
+            final String finalUserId = userId;
+            final String finalEmail = email;
+            final String finalRoles = roles;
 
-            // Forward enriched request with user context headers
-            // Services use these headers to know WHO is making the request
-            ServerHttpRequest enrichedRequest = request.mutate()
-                    .header("X-User-Id", userId)
-                    .header("X-User-Email", email != null ? email : "")
-                    .header("X-User-Roles", roles != null ? roles : "")
-                    .header("X-Correlation-ID", finalCorrelationId)
-                    .build();
+            // Check if token is blacklisted in Redis (logged out)
+            String blacklistKey = "blacklist:" + token;
+            return redisTemplate.hasKey(blacklistKey)
+                    .flatMap(isBlacklisted -> {
+                        if (Boolean.TRUE.equals(isBlacklisted)) {
+                            log.warn("Blacklisted token used for path: {} [correlationId={}]", path, finalCorrelationId);
+                            return unauthorizedResponse(exchange);
+                        }
 
-            return chain.filter(exchange.mutate().request(enrichedRequest).build());
+                        log.debug("JWT validated for user: {} path: {} [correlationId={}]",
+                                finalUserId, path, finalCorrelationId);
+
+                        // Forward enriched request with user context headers
+                        ServerHttpRequest enrichedRequest = request.mutate()
+                                .header("X-User-Id", finalUserId)
+                                .header("X-User-Email", finalEmail != null ? finalEmail : "")
+                                .header("X-User-Roles", finalRoles != null ? finalRoles : "")
+                                .header("X-Correlation-ID", finalCorrelationId)
+                                .build();
+
+                        return chain.filter(exchange.mutate().request(enrichedRequest).build());
+                    })
+                    .onErrorResume(e -> {
+                        // If Redis is down, fall back to allowing the request (fail open)
+                        log.warn("Redis check failed, proceeding without blacklist check: {}", e.getMessage());
+                        ServerHttpRequest enrichedRequest = request.mutate()
+                                .header("X-User-Id", finalUserId)
+                                .header("X-User-Email", finalEmail != null ? finalEmail : "")
+                                .header("X-User-Roles", finalRoles != null ? finalRoles : "")
+                                .header("X-Correlation-ID", finalCorrelationId)
+                                .build();
+                        return chain.filter(exchange.mutate().request(enrichedRequest).build());
+                    });
 
         } catch (Exception e) {
             log.warn("JWT validation failed for path: {} - Error: {} [correlationId={}]",
