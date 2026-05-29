@@ -13,14 +13,11 @@ server:
 spring.data.mongodb:
   uri: mongodb://localhost:27017/notification_db
 
-spring.mail:
+spring.rabbitmq:
   host: localhost
-  port: 1025
-  username: ""
-  password: ""
-  properties:
-    mail.smtp.auth: false
-    mail.smtp.starttls.enable: false
+  port: 5672
+  username: guest
+  password: guest
 
 spring.kafka:
   bootstrap-servers: localhost:9092
@@ -30,9 +27,18 @@ spring.kafka:
     auto-offset-reset: earliest
     properties:
       spring.json.trusted.packages: "com.amazondemo.*"
-  producer:
-    key-serializer: org.apache.kafka.common.serialization.StringSerializer
-    value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+spring.mail:
+  host: localhost
+  port: 1025
+  username: ""
+  password: ""
+  properties:
+    mail:
+      smtp:
+        auth: false
+        starttls:
+          enable: false
 
 eureka:
   client:
@@ -45,4 +51,30 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /notification-service/api-docs
+
+# AWS - defaults (disabled, overridden by profile)
+app:
+  notification:
+    from-email: noreply@amazondemo.com
+    from-name: "Amazon Demo"
+  aws:
+    enabled: false
+    ses:
+      enabled: false
+    sqs:
+      endpoint: ""
+  features:
+    email-notifications: false
+    sqs-events: false
+
+logging:
+  level:
+    com.amazondemo.notification: DEBUG

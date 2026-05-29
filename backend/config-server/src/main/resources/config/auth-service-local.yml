@@ -1,0 +1,14 @@
+# Auth Service - LOCAL environment overrides
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/auth_db
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  data:
+    redis:
+      host: redis
+      port: 6379

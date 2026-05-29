@@ -1,0 +1,83 @@
+# ============================================================
+# STAGING ENVIRONMENT - LocalStack AWS Simulation
+# ============================================================
+# Active when: SPRING_PROFILES_ACTIVE=stage
+# Infrastructure: Docker Compose with LocalStack for AWS
+# AWS services: S3, SQS, SNS, SES, Secrets Manager via LocalStack
+# Purpose: Pre-production validation with real AWS API surface
+#
+# LOCALSTACK ENDPOINTS: All at http://localstack:4566
+# Run with: docker compose -f docker-compose.stage.yml up -d
+
+spring:
+  kafka:
+    bootstrap-servers: kafka:29092
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      timeout: 2000ms
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@discovery-server:8761/eureka/
+
+# JWT - staging secret (different from local and prod)
+app:
+  jwt:
+    secret: "stage-env-jwt-secret-amazondemo-min-256-bits-for-hs512-secure"
+    access-token-expiry: 900000       # 15 minutes
+    refresh-token-expiry: 604800000   # 7 days
+
+  # AWS via LocalStack - full AWS API compatibility
+  aws:
+    enabled: true
+    region: us-east-1
+    endpoint: "http://localstack:4566"    # LocalStack unified endpoint
+    access-key: "test"                    # LocalStack accepts any non-empty value
+    secret-key: "test"
+    s3:
+      bucket-name: amazon-demo-stage
+      endpoint: "http://localstack:4566"
+      path-style-access: true             # Required for LocalStack
+    sqs:
+      endpoint: "http://localstack:4566"
+      queue-url-prefix: "http://localstack:4566/000000000000"
+    sns:
+      endpoint: "http://localstack:4566"
+      topic-arn-prefix: "arn:aws:sns:us-east-1:000000000000"
+    ses:
+      enabled: true
+      endpoint: "http://localstack:4566"
+      from-email: "noreply@amazondemo-stage.com"
+    secrets-manager:
+      enabled: true
+      endpoint: "http://localstack:4566"
+
+  # Feature flags - AWS features enabled via LocalStack
+  features:
+    email-notifications: true    # SES via LocalStack
+    sms-notifications: false     # SNS SMS not fully supported in LocalStack
+    s3-uploads: true             # S3 via LocalStack
+    sqs-events: true             # SQS via LocalStack
+    sns-alerts: true             # SNS via LocalStack
+
+  branding:
+    app-name: "Amazon Demo [STAGING]"
+    company-name: "Amazon Demo Inc."
+    support-email: "stage-support@amazondemo.com"
+
+logging:
+  level:
+    com.amazondemo: INFO
+    org.springframework.security: WARN
+    com.amazonaws: WARN
+    software.amazon.awssdk: WARN

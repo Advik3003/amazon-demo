@@ -1,0 +1,71 @@
+# ============================================================
+# LOCAL ENVIRONMENT - Docker Compose (developer workstation)
+# ============================================================
+# Active when: SPRING_PROFILES_ACTIVE=local
+# Infrastructure: All services run in Docker on localhost
+# AWS services: NOT available (feature flags disabled)
+# Purpose: Fast local development with hot reload
+
+spring:
+  kafka:
+    bootstrap-servers: kafka:29092
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://admin:admin123@discovery-server:8761/eureka/
+
+# JWT - local dev secret (NOT for production)
+app:
+  jwt:
+    secret: "local-dev-jwt-secret-amazondemo-min-256-bits-for-hs512"
+    access-token-expiry: 900000       # 15 minutes
+    refresh-token-expiry: 604800000   # 7 days
+
+  # AWS is disabled locally - all uploads go to local filesystem
+  aws:
+    enabled: false
+    region: us-east-1
+    endpoint: ""
+    access-key: "local"
+    secret-key: "local"
+    s3:
+      bucket-name: amazon-demo-local
+      endpoint: ""
+    sqs:
+      endpoint: ""
+    ses:
+      enabled: false
+    secrets-manager:
+      enabled: false
+
+  # Feature flags
+  features:
+    email-notifications: false   # Uses Mailhog for local dev
+    sms-notifications: false
+    s3-uploads: false            # Store files locally
+    sqs-events: false            # Use Kafka/RabbitMQ directly
+    sns-alerts: false
+
+  branding:
+    app-name: "Amazon Demo [LOCAL]"
+    company-name: "Amazon Demo Inc."
+    support-email: "dev@localhost"
+
+logging:
+  level:
+    com.amazondemo: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.cloud.gateway: DEBUG

@@ -197,28 +197,32 @@ services:
     networks:
       - amazon-demo-network
 
-  # LocalStack - AWS Services Mock (S3, SQS, etc.)
+  # LocalStack - AWS Services Mock (S3, SQS, SNS, SES, Secrets Manager)
+  # Used in local and staging environments for AWS service simulation
   localstack:
     image: localstack/localstack:3.4
     container_name: amazon-demo-localstack
     environment:
-      SERVICES: s3,sqs,sns
+      SERVICES: s3,sqs,sns,ses,secretsmanager,ssm,iam,sts
       DEBUG: 0
       AWS_DEFAULT_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
+      PERSISTENCE: 1
     volumes:
       - localstack_data:/var/lib/localstack
       - ./infrastructure/localstack/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "4566:4566"
     networks:
       - amazon-demo-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/health"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "bash", "-c", "curl -sf http://localhost:4566/_localstack/health | grep -q 'running' || curl -sf http://localhost:4566/_localstack/health"]
+      interval: 15s
+      timeout: 10s
       retries: 10
+      start_period: 30s
 
   # Mailhog - Email testing (catch all emails in dev)
   mailhog:
@@ -241,7 +245,7 @@ services:
       - postgres
       - redis
     environment:
-      SPRING_PROFILES_ACTIVE: native
+      SPRING_PROFILES_ACTIVE: local
       SERVER_PORT: 8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
     ports:
@@ -264,7 +268,7 @@ services:
       config-server:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: local
       SERVER_PORT: 8761
     ports:
       - "8761:8761"
@@ -290,14 +294,22 @@ services:
       discovery-server:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
     ports:
       - "8081:8081"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   user-service:
     build:
@@ -312,6 +324,7 @@ services:
       discovery-server:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -321,6 +334,12 @@ services:
       - "8082:8082"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   product-service:
     build:
@@ -337,6 +356,7 @@ services:
       kafka:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/product_db
       SPRING_DATA_MONGODB_URI: mongodb://admin:admin123@mongo:27017/product_read_db?authSource=admin
       SPRING_DATA_REDIS_HOST: redis
@@ -348,6 +368,12 @@ services:
       - "8083:8083"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   inventory-service:
     build:
@@ -362,6 +388,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inventory_db
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATA_REDIS_HOST: redis
@@ -372,6 +399,12 @@ services:
       - "8084:8084"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   order-service:
     build:
@@ -388,10 +421,12 @@ services:
       redis:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_db
       SPRING_DATA_MONGODB_URI: mongodb://admin:admin123@mongo:27017/order_read_db?authSource=admin
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
@@ -400,6 +435,12 @@ services:
       - "8085:8085"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   payment-service:
     build:
@@ -414,6 +455,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATA_REDIS_HOST: redis
@@ -424,6 +466,12 @@ services:
       - "8086:8086"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   notification-service:
     build:
@@ -440,6 +488,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       SPRING_DATA_MONGODB_URI: mongodb://admin:admin123@mongo:27017/notification_db?authSource=admin
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_RABBITMQ_HOST: rabbitmq
@@ -454,6 +503,12 @@ services:
       - "8087:8087"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8087/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   api-gateway:
     build:
@@ -466,6 +521,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: local
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379

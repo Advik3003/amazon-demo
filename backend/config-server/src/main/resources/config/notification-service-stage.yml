@@ -1,0 +1,25 @@
+# Notification Service - STAGING environment overrides (LocalStack SES + SQS)
+spring:
+  data:
+    mongodb:
+      uri: mongodb://admin:admin123@mongo:27017/notification_db?authSource=admin
+  mail:
+    host: mailhog
+    port: 1025
+
+app:
+  notification:
+    from-email: noreply@amazondemo-stage.com
+    from-name: "Amazon Demo Stage"
+  aws:
+    ses:
+      enabled: true
+      endpoint: "http://localstack:4566"
+      from-email: noreply@amazondemo-stage.com
+    sqs:
+      endpoint: "http://localstack:4566"
+      order-notifications-queue: "http://localstack:4566/000000000000/order-notifications"
+      payment-notifications-queue: "http://localstack:4566/000000000000/payment-notifications"
+  features:
+    email-notifications: true
+    sqs-events: true

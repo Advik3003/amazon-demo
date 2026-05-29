@@ -63,6 +63,9 @@
         <testcontainers.version>1.20.3</testcontainers.version>
         <resilience4j.version>2.2.0</resilience4j.version>
         <micrometer.version>1.13.5</micrometer.version>
+
+        <!-- AWS SDK Version -->
+        <aws.sdk.version>2.26.12</aws.sdk.version>
     </properties>
 
     <!-- ==================== DEPENDENCY MANAGEMENT ==================== -->
@@ -132,6 +135,15 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- AWS SDK v2 BOM - manages all AWS SDK module versions -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

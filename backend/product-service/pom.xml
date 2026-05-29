@@ -30,6 +30,9 @@
         <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-api</artifactId></dependency>
         <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-impl</artifactId></dependency>
         <dependency><groupId>io.jsonwebtoken</groupId><artifactId>jjwt-jackson</artifactId></dependency>
+        <!-- AWS SDK v2 - S3 for product image uploads -->
+        <dependency><groupId>software.amazon.awssdk</groupId><artifactId>s3</artifactId></dependency>
+        <dependency><groupId>software.amazon.awssdk</groupId><artifactId>sts</artifactId></dependency>
     </dependencies>
     <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
 </project>

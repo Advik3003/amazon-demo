@@ -1,0 +1,26 @@
+# Notification Service - LOCAL environment overrides
+spring:
+  data:
+    mongodb:
+      uri: mongodb://admin:admin123@mongo:27017/notification_db?authSource=admin
+  mail:
+    host: mailhog
+    port: 1025
+    username: ""
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+app:
+  aws:
+    ses:
+      enabled: false
+    sqs:
+      endpoint: ""
+  features:
+    email-notifications: false   # Mailhog for local dev
+    sqs-events: false

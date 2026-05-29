@@ -1,0 +1,15 @@
+# Notification Service - TEST environment overrides
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/notification_test_db
+  mail:
+    host: localhost
+    port: 1025
+    username: ""
+    password: ""
+
+app:
+  features:
+    email-notifications: false
+    sqs-events: false

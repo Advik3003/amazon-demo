@@ -1,0 +1,9 @@
+# User Service - STAGING environment overrides
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/user_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate

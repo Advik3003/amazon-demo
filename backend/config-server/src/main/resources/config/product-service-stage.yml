@@ -1,0 +1,22 @@
+# Product Service - STAGING environment overrides (LocalStack)
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/product_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    mongodb:
+      uri: mongodb://admin:admin123@mongo:27017/product_read_db?authSource=admin
+
+app:
+  aws:
+    s3:
+      bucket-name: amazon-demo-stage
+      endpoint: "http://localstack:4566"
+      path-style-access: true
+  features:
+    s3-uploads: true   # S3 via LocalStack

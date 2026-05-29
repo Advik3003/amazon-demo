@@ -62,3 +62,26 @@ springdoc:
     path: /product-service/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+# AWS - defaults (disabled, overridden by profile configs)
+app:
+  aws:
+    enabled: false
+    region: us-east-1
+    s3:
+      bucket-name: amazon-demo-local
+      endpoint: ""
+  cache:
+    product-ttl: 300
+    category-ttl: 3600
+    search-ttl: 60
+  kafka:
+    topics:
+      product-events: product-events
+      inventory-events: inventory-events
+  features:
+    s3-uploads: false
+
+logging:
+  level:
+    com.amazondemo.product: DEBUG

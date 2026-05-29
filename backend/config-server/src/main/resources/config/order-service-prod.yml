@@ -1,0 +1,21 @@
+# Order Service - PRODUCTION environment overrides
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/order_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://admin:admin123@mongo:27017/order_read_db?authSource=admin}
+
+app:
+  aws:
+    sqs:
+      endpoint: ""
+      order-events-queue: "https://sqs.us-east-1.amazonaws.com/123456789012/amazon-demo-prod-order-events"

@@ -1,0 +1,6 @@
+# API Gateway - LOCAL environment overrides
+spring:
+  data:
+    redis:
+      host: redis
+      port: 6379

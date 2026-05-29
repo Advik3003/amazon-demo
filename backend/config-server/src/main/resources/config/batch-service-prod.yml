@@ -1,0 +1,17 @@
+# Batch Service - PRODUCTION environment overrides
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/batch_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+app:
+  aws:
+    s3:
+      reports-bucket: ${S3_REPORTS_BUCKET:amazon-demo-prod-reports}
+      endpoint: ""

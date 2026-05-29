@@ -14,10 +14,16 @@ spring.datasource:
   url: jdbc:postgresql://localhost:5432/inventory_db
   username: postgres
   password: postgres
+  driver-class-name: org.postgresql.Driver
 
 spring.jpa:
   hibernate:
     ddl-auto: update
+  show-sql: false
+
+spring.data.redis:
+  host: localhost
+  port: 6379
 
 spring.kafka:
   bootstrap-servers: localhost:9092
@@ -42,4 +48,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /inventory-service/api-docs
+
+logging:
+  level:
+    com.amazondemo.inventory: DEBUG

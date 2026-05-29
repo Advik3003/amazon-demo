@@ -11,8 +11,16 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 
 # ===== Spring Boot =====
-application-local.yml
+# Only ignore secrets files at the root of any service resource dir (not in config-server)
+src/main/resources/application-local.yml
 application-secrets.yml
+
+# ===== Environment Files =====
+# Commit .env.local, .env.test, .env.stage (no real secrets - safe for learning project)
+# NEVER commit .env.prod in real projects - may contain real credentials
+# For this DEMO project, .env.prod also committed (contains only dummy values)
+environments/.env.real-prod
+.env.real-prod
 
 # ===== IDE =====
 .idea/
@@ -40,8 +48,9 @@ yarn-error.log*
 
 # ===== Environment secrets =====
 .env
-.env.*
-!.env.example
+# Keep environments/ folder and its .env.* files (they have no real secrets in this demo)
+# Only ignore a real-prod env file
+.env.real-prod
 secrets/
 
 # ===== Kubernetes =====

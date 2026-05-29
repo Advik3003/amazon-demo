@@ -1,0 +1,13 @@
+# Order Service - LOCAL environment overrides
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/order_db
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  data:
+    mongodb:
+      uri: mongodb://admin:admin123@mongo:27017/order_read_db?authSource=admin

@@ -23,6 +23,9 @@
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
         <dependency><groupId>org.springdoc</groupId><artifactId>springdoc-openapi-starter-webmvc-ui</artifactId></dependency>
         <dependency><groupId>com.amazondemo</groupId><artifactId>common-lib</artifactId></dependency>
+        <!-- AWS SDK v2 - SES for email, SQS for event queues -->
+        <dependency><groupId>software.amazon.awssdk</groupId><artifactId>ses</artifactId></dependency>
+        <dependency><groupId>software.amazon.awssdk</groupId><artifactId>sqs</artifactId></dependency>
     </dependencies>
     <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
 </project>

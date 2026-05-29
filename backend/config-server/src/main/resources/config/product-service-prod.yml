@@ -1,0 +1,28 @@
+# Product Service - PRODUCTION environment overrides
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/product_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://admin:admin123@mongo:27017/product_read_db?authSource=admin}
+
+app:
+  aws:
+    s3:
+      bucket-name: ${S3_BUCKET:amazon-demo-prod}
+      endpoint: ""   # Real AWS
+      cdn-url: ${CDN_URL:https://cdn.amazondemo.com}
+  cache:
+    product-ttl: 600      # 10 minutes in prod (more caching)
+    category-ttl: 7200    # 2 hours
+    search-ttl: 300       # 5 minutes
+  features:
+    s3-uploads: true

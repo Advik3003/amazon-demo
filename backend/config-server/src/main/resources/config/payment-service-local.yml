@@ -1,0 +1,10 @@
+# Payment Service - LOCAL environment overrides
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/payment_db
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true

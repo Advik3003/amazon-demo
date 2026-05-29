@@ -1,0 +1,74 @@
+# ============================================================
+# TEST ENVIRONMENT - Unit & Integration Tests
+# ============================================================
+# Active when: SPRING_PROFILES_ACTIVE=test
+# Infrastructure: Embedded/TestContainers, H2 in-memory DBs
+# AWS services: Mocked with Mockito / embedded stubs
+# Purpose: Automated testing in CI/CD pipeline
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092  # Embedded Kafka from @EmbeddedKafka
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+  data:
+    redis:
+      host: localhost
+      port: 6379   # TestContainers Redis or embedded
+
+eureka:
+  client:
+    enabled: false         # Disable Eureka in tests
+    register-with-eureka: false
+    fetch-registry: false
+  instance:
+    prefer-ip-address: true
+
+# JWT - test secret (short-lived tokens for tests)
+app:
+  jwt:
+    secret: "test-env-jwt-secret-amazondemo-min-256-bits-for-hs512"
+    access-token-expiry: 60000        # 1 minute (fast expiry for tests)
+    refresh-token-expiry: 300000      # 5 minutes
+
+  # AWS - all mocked/stubbed in test environment
+  aws:
+    enabled: false
+    region: us-east-1
+    endpoint: "http://localhost:4566"
+    access-key: "test"
+    secret-key: "test"
+    s3:
+      bucket-name: amazon-demo-test
+      endpoint: "http://localhost:4566"
+    sqs:
+      endpoint: "http://localhost:4566"
+    ses:
+      enabled: false
+    secrets-manager:
+      enabled: false
+
+  # All features off in test to avoid external dependencies
+  features:
+    email-notifications: false
+    sms-notifications: false
+    s3-uploads: false
+    sqs-events: false
+    sns-alerts: false
+
+  branding:
+    app-name: "Amazon Demo [TEST]"
+    company-name: "Amazon Demo Inc."
+    support-email: "test@localhost"
+
+logging:
+  level:
+    com.amazondemo: DEBUG
+    org.springframework.security: WARN
+    org.springframework.cloud: WARN
+    org.springframework.test: INFO

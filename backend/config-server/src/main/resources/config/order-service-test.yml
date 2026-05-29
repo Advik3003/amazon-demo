@@ -1,0 +1,15 @@
+# Order Service - TEST environment overrides
+spring:
+  datasource:
+    url: jdbc:h2:mem:order_test_db;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+    show-sql: true
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/order_test_db

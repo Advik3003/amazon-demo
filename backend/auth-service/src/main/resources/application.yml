@@ -1,23 +1,25 @@
 spring:
   application:
     name: auth-service
+  # Load config from Config Server first, fall back to local if unavailable
   config:
     import: optional:configserver:http://localhost:8888
   cloud:
     config:
       fail-fast: false
-      retry:
-        max-attempts: 3
 
-# Fallback config when Config Server is not available
 server:
   port: 8081
 
+# Default (dev/local) values - overridden by Config Server per environment
 spring.datasource:
   url: jdbc:postgresql://localhost:5432/auth_db
   username: postgres
   password: postgres
   driver-class-name: org.postgresql.Driver
+  hikari:
+    maximum-pool-size: 10
+    minimum-idle: 5
 
 spring.jpa:
   hibernate:
@@ -31,6 +33,16 @@ spring.data.redis:
   host: localhost
   port: 6379
 
+springdoc:
+  api-docs:
+    path: /auth-service/api-docs
+  swagger-ui:
+    path: /auth-service/swagger-ui.html
+
+logging:
+  level:
+    com.amazondemo.auth: DEBUG
+
 eureka:
   client:
     service-url:
@@ -42,19 +54,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always
-
-app:
-  jwt:
-    secret: "amazondemo-super-secret-jwt-key-change-in-production-min-256-bits"
-    access-token-expiry: 900000
-    refresh-token-expiry: 604800000
-
-springdoc:
-  api-docs:
-    path: /auth-service/api-docs
-  swagger-ui:
-    path: /swagger-ui.html

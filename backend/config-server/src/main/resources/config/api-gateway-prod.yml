@@ -1,0 +1,14 @@
+# API Gateway - PRODUCTION environment overrides
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+# Tighter rate limiting in prod
+app:
+  gateway:
+    rate-limit:
+      requests-per-second: 50     # Production rate limit
+      burst-capacity: 100

@@ -1,0 +1,33 @@
+# Notification Service - PRODUCTION environment overrides
+spring:
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://admin:admin123@mongo:27017/notification_db?authSource=admin}
+  mail:
+    host: ${SMTP_HOST:email-smtp.us-east-1.amazonaws.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:AKIADUMMYSMTPUSER}
+    password: ${SMTP_PASSWORD:dummySmtpPasswordForDemo}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  notification:
+    from-email: ${FROM_EMAIL:noreply@amazondemo.com}
+    from-name: "Amazon Demo"
+  aws:
+    ses:
+      enabled: true
+      endpoint: ""   # Real AWS SES
+      from-email: ${SES_FROM_EMAIL:noreply@amazondemo.com}
+    sqs:
+      endpoint: ""   # Real AWS SQS
+      order-notifications-queue: "https://sqs.us-east-1.amazonaws.com/123456789012/amazon-demo-prod-order-notifications"
+      payment-notifications-queue: "https://sqs.us-east-1.amazonaws.com/123456789012/amazon-demo-prod-payment-notifications"
+  features:
+    email-notifications: true
+    sqs-events: true

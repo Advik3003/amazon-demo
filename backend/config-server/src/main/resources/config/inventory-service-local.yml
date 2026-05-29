@@ -1,0 +1,10 @@
+# Inventory Service - LOCAL environment overrides
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/inventory_db
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true

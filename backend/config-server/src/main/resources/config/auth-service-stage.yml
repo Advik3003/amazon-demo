@@ -1,0 +1,17 @@
+# Auth Service - STAGING environment overrides
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/auth_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    redis:
+      host: redis
+      port: 6379

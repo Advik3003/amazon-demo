@@ -1,0 +1,19 @@
+# Order Service - STAGING environment overrides (LocalStack SQS for events)
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/order_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    mongodb:
+      uri: mongodb://admin:admin123@mongo:27017/order_read_db?authSource=admin
+
+app:
+  aws:
+    sqs:
+      endpoint: "http://localstack:4566"
+      order-events-queue: "http://localstack:4566/000000000000/order-events"
