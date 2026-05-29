@@ -1,0 +1,20 @@
+# ============================================================
+# Logstash Settings
+# ============================================================
+http.host: "0.0.0.0"
+http.port: 9600            # Logstash monitoring API port
+
+# Pipeline settings
+pipeline.workers: 2        # Number of pipeline threads
+pipeline.batch.size: 125   # Events per batch (tune for throughput)
+pipeline.batch.delay: 50   # Max wait time (ms) before sending a batch
+
+# Log level (debug | info | warn | error)
+log.level: info
+
+# Monitoring
+monitoring.enabled: false  # Enable if using Elastic monitoring cluster
+
+# Performance
+queue.type: memory         # Use "persisted" for production (survives restarts)
+queue.max_bytes: 1gb       # Max in-memory queue size

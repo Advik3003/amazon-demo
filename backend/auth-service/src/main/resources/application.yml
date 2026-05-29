@@ -47,10 +47,6 @@ springdoc:
   swagger-ui:
     path: /auth-service/swagger-ui.html
 
-logging:
-  level:
-    com.amazondemo.auth: DEBUG
-
 eureka:
   client:
     service-url:
@@ -58,6 +54,9 @@ eureka:
   instance:
     prefer-ip-address: true
 
+# ============================================================
+# OBSERVABILITY: Distributed Tracing + Structured Logging
+# ============================================================
 management:
   endpoints:
     web:
@@ -66,3 +65,21 @@ management:
   endpoint:
     health:
       show-details: always
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0    # 100% in dev; set to 0.1 (10%) in production
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+
+logging:
+  level:
+    com.amazondemo.auth: DEBUG
+  pattern:
+    level: "%5p [%X{traceId:-},%X{spanId:-}]"
+
+# Logstash connection (used by logback-spring.xml)
+logstash:
+  host: localhost
+  port: 5000

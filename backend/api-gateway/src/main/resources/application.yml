@@ -33,3 +33,9 @@ logging:
   level:
     com.amazondemo.gateway: DEBUG
     org.springframework.cloud.gateway: INFO
+
+
+logstash:
+  host: localhost
+  port: 5000
+

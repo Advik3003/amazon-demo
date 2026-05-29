@@ -64,6 +64,9 @@
         <resilience4j.version>2.2.0</resilience4j.version>
         <micrometer.version>1.13.5</micrometer.version>
 
+        <!-- Observability Versions -->
+        <logstash-logback.version>8.0</logstash-logback.version>
+
         <!-- AWS SDK Version -->
         <aws.sdk.version>2.26.12</aws.sdk.version>
     </properties>
@@ -145,6 +148,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!-- Logstash Logback Encoder - structured JSON logs for ELK -->
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-logback.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -163,6 +173,36 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!--
+            ============================================================
+            OBSERVABILITY STACK  (inherited by ALL services)
+            ============================================================
+            Architecture:
+              Services -> Micrometer Tracing -> OTel Bridge -> Zipkin    (distributed tracing)
+              Services -> Logback JSON      -> Logstash TCP -> Elasticsearch -> Kibana  (log aggregation)
+
+            Components:
+              micrometer-tracing-bridge-otel : Bridges Micrometer Tracing API to OpenTelemetry SDK
+              opentelemetry-exporter-zipkin  : Exports OTel spans to Zipkin via HTTP
+              logstash-logback-encoder       : Formats logs as JSON (required by ELK pipeline)
+        -->
+
+        <!-- Distributed Tracing: Micrometer → OpenTelemetry → Zipkin -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-zipkin</artifactId>
+        </dependency>
+
+        <!-- Structured Logging: JSON format for Logstash/ELK ingestion -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
         </dependency>
     </dependencies>
 

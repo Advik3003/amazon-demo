@@ -40,6 +40,18 @@ version: '3.8'
 #   Zipkin:            9411
 #   LocalStack:        4566
 #   Mailhog:           8025 (UI), 1025 (SMTP)
+#
+# OBSERVABILITY STACK:
+#   Elasticsearch:     9200 (REST API)
+#   Kibana:            5601 (Dashboard UI)  → http://localhost:5601
+#   Logstash:          5000 (TCP log input), 5044 (Beats), 9600 (API)
+#   Zipkin UI:         http://localhost:9411
+#
+# OBSERVABILITY QUICK START:
+#   docker compose up -d elasticsearch logstash kibana zipkin
+#   # Wait 60s for Elasticsearch to be healthy
+#   # Open Kibana: http://localhost:5601
+#   # Open Zipkin: http://localhost:9411
 # ============================================================
 
 networks:
@@ -54,6 +66,8 @@ volumes:
   kafka_data:
   zookeeper_data:
   localstack_data:
+  elasticsearch_data:
+  kibana_data:
 
 services:
 
@@ -188,7 +202,22 @@ services:
       timeout: 10s
       retries: 5
 
+  # ==================== OBSERVABILITY STACK ====================
+  # Architecture:
+  #   Spring Services ──JSON──► Logstash:5000 ──► Elasticsearch ──► Kibana
+  #   Spring Services ──HTTP──► Zipkin:9411    (distributed traces)
+  #
+  # Zipkin: visualizes distributed traces (which service called which, how long)
+  # ELK:    aggregates, stores, and searches all application logs with full-text
+  #
+  # KEY DIFFERENCE:
+  #   Zipkin  = "What happened in this request?" (trace timeline, latency)
+  #   ELK     = "What did the application log?" (searchable log archive)
+  #   Both complement each other - link via traceId in Kibana filters
+  # ============================================================
+
   # Zipkin - Distributed Tracing UI
+  # Receives spans from Spring services via Micrometer → OTel → Zipkin HTTP exporter
   zipkin:
     image: openzipkin/zipkin:3
     container_name: amazon-demo-zipkin
@@ -196,6 +225,91 @@ services:
       - "9411:9411"
     networks:
       - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9411/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Elasticsearch - Log storage and search engine
+  # Stores structured JSON logs shipped by Logstash
+  # One index per service per day: amazondemo-{service}-{YYYY.MM.dd}
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: amazon-demo-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false       # Disable auth for local dev
+      - xpack.security.http.ssl.enabled=false
+      - xpack.license.self_generated.type=basic
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Logstash - Log aggregation and transformation pipeline
+  # Receives JSON logs from Spring services over TCP, routes to Elasticsearch
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.0
+    container_name: amazon-demo-logstash
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - LS_JAVA_OPTS=-Xms256m -Xmx256m
+    volumes:
+      - ./infrastructure/elk/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./infrastructure/elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    ports:
+      - "5000:5000/tcp"   # TCP JSON input (Spring Boot services)
+      - "5044:5044"       # Beats input
+      - "9600:9600"       # Logstash monitoring API
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9600/?pretty"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Kibana - Log visualization and search dashboard
+  # Data Views to create after first start:
+  #   amazondemo-*  → view all service logs
+  #   amazondemo-order-* → view only order service
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    container_name: amazon-demo-kibana
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+    volumes:
+      - ./infrastructure/elk/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - kibana_data:/usr/share/kibana/data
+    ports:
+      - "5601:5601"
+    networks:
+      - amazon-demo-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5601/api/status"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
 
   # LocalStack - AWS Services Mock (S3, SQS, SNS, SES, Secrets Manager)
   # Used in local and staging environments for AWS service simulation
@@ -293,6 +407,8 @@ services:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
+      zipkin:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
@@ -300,6 +416,9 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin123@discovery-server:8761/eureka/
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5000
     ports:
       - "8081:8081"
     networks:
@@ -546,3 +665,5 @@ services:
       - api-gateway
     networks:
       - amazon-demo-network
+
+

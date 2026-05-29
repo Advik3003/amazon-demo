@@ -51,11 +51,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: always
-
+        include: health,info,metrics
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
 springdoc:
   api-docs:
     path: /notification-service/api-docs
@@ -78,3 +81,9 @@ app:
 logging:
   level:
     com.amazondemo.notification: DEBUG
+
+# Logstash connection (used by logback-spring.xml)
+logstash:
+  host: localhost
+  port: 5000
+

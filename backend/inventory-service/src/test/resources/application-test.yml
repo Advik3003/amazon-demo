@@ -26,3 +26,11 @@ eureka:
 logging:
   level:
     com.amazondemo: DEBUG
+
+# Disable distributed tracing in tests (no Zipkin/Logstash infrastructure needed)
+management:
+  tracing:
+    enabled: false
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

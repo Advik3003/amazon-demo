@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================
+  AUTH SERVICE - Logback Configuration
+  ============================================================
+  Distributed Observability Architecture:
+
+  LOCAL / DEV:
+    Console (human-readable)  ──→ developer terminal
+    JSON TCP Appender         ──→ Logstash:5000  ──→ Elasticsearch  ──→ Kibana
+
+  TEST:
+    Console only (no Logstash TCP - no infrastructure required)
+
+  PRODUCTION:
+    Async JSON TCP Appender  ──→ Logstash  ──→ Elasticsearch  ──→ Kibana
+    (console disabled in prod for performance)
+
+  TRACE CORRELATION:
+    Micrometer Tracing + OTel automatically populates MDC with:
+      - traceId  : unique per request (same across all services for one request)
+      - spanId   : unique per service hop
+      - parentId : links this span to the calling service's span
+    These MDC fields are included in EVERY log line → enables Kibana to group
+    all logs from a single distributed request by traceId.
+
+  LOG FORMAT (JSON):
+    {
+      "@timestamp"    : "2026-05-29T11:00:00.000Z",
+      "level"         : "INFO",
+      "service"       : "auth-service",
+      "environment"   : "local",
+      "traceId"       : "abc123...",
+      "spanId"        : "def456...",
+      "thread"        : "http-nio-8081-exec-1",
+      "logger"        : "com.amazondemo.auth.service.AuthService",
+      "message"       : "User login successful: user@example.com",
+      "stack_trace"   : "..." (only on errors)
+    }
+  ============================================================
+-->
+<configuration scan="true" scanPeriod="30 seconds">
+
+    <!-- ==================== PROPERTIES ==================== -->
+    <springProperty scope="context" name="SERVICE_NAME"   source="spring.application.name" defaultValue="auth-service"/>
+    <springProperty scope="context" name="ACTIVE_PROFILE" source="spring.profiles.active"  defaultValue="local"/>
+    <springProperty scope="context" name="LOGSTASH_HOST"  source="logstash.host"            defaultValue="localhost"/>
+    <springProperty scope="context" name="LOGSTASH_PORT"  source="logstash.port"            defaultValue="5000"/>
+
+    <!-- ==================== CONSOLE APPENDER ==================== -->
+    <!-- Human-readable format for local development -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] [%highlight(%-5level)] [%cyan(${SERVICE_NAME})] [trace=%X{traceId:-} span=%X{spanId:-}] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ==================== JSON CONSOLE APPENDER ==================== -->
+    <!-- Used in staging/production where logs are collected by Docker/Kubernetes log drivers -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Standard fields always included -->
+            <customFields>{"service":"${SERVICE_NAME}","environment":"${ACTIVE_PROFILE}"}</customFields>
+            <!-- Include MDC fields (traceId, spanId auto-added by Micrometer Tracing) -->
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>parentId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>requestId</includeMdcKeyName>
+            <!-- Include caller info for debugging -->
+            <includeCallerData>false</includeCallerData>
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerCause>20</maxDepthPerCause>
+                <shortenedClassNameLength>35</shortenedClassNameLength>
+                <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+        </encoder>
+    </appender>
+
+    <!-- ==================== LOGSTASH TCP APPENDER ==================== -->
+    <!-- Ships JSON logs directly to Logstash via TCP socket -->
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOGSTASH_HOST}:${LOGSTASH_PORT}</destination>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <reconnectionDelay>10 second</reconnectionDelay>
+        <connectionTimeout>10 second</connectionTimeout>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"${SERVICE_NAME}","environment":"${ACTIVE_PROFILE}"}</customFields>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+            <includeMdcKeyName>parentId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
+            <includeMdcKeyName>requestId</includeMdcKeyName>
+            <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                <maxDepthPerCause>20</maxDepthPerCause>
+                <rootCauseFirst>true</rootCauseFirst>
+            </throwableConverter>
+        </encoder>
+    </appender>
+
+    <!-- ==================== ASYNC LOGSTASH APPENDER ==================== -->
+    <!-- Wraps LOGSTASH in async queue to prevent log I/O blocking request threads -->
+    <appender name="ASYNC_LOGSTASH" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="LOGSTASH"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>  <!-- Never discard on high load -->
+        <includeCallerData>false</includeCallerData>
+        <neverBlock>true</neverBlock>  <!-- Drop log if queue full (don't block request thread) -->
+    </appender>
+
+    <!-- ==================== LOGGER LEVELS ==================== -->
+
+    <!-- Reduce noise from infrastructure libraries -->
+    <logger name="org.springframework.cloud.netflix.eureka" level="WARN"/>
+    <logger name="com.netflix.discovery"                    level="WARN"/>
+    <logger name="org.springframework.security"             level="WARN"/>
+    <logger name="org.hibernate.SQL"                        level="WARN"/>
+    <logger name="org.hibernate.orm.jdbc.bind"              level="WARN"/>
+    <logger name="org.apache.kafka"                         level="WARN"/>
+    <logger name="io.lettuce"                               level="WARN"/>
+
+    <!-- Application package: DEBUG in dev, INFO in prod -->
+    <logger name="com.amazondemo" level="DEBUG"/>
+
+    <!-- ==================== PROFILE-BASED ROOT LOGGERS ==================== -->
+
+    <!-- TEST: Console only - no Logstash needed -->
+    <springProfile name="test">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.amazondemo" level="DEBUG"/>
+    </springProfile>
+
+    <!-- LOCAL / DEV: Console (readable) + Logstash (searchable) -->
+    <springProfile name="local,default">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_LOGSTASH"/>
+        </root>
+    </springProfile>
+
+    <!-- STAGING: JSON Console + Logstash -->
+    <springProfile name="stage">
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+            <appender-ref ref="ASYNC_LOGSTASH"/>
+        </root>
+        <logger name="com.amazondemo" level="INFO"/>
+    </springProfile>
+
+    <!-- PRODUCTION: JSON Console only (log driver collects, no direct TCP) -->
+    <springProfile name="prod">
+        <root level="WARN">
+            <appender-ref ref="JSON_CONSOLE"/>
+            <appender-ref ref="ASYNC_LOGSTASH"/>
+        </root>
+        <logger name="com.amazondemo" level="INFO"/>
+    </springProfile>
+
+</configuration>
