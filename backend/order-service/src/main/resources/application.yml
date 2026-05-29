@@ -18,8 +18,16 @@ spring.datasource:
 
 spring.jpa:
   hibernate:
-    ddl-auto: update
+    ddl-auto: validate
   show-sql: false
+
+spring.flyway:
+  enabled: true
+  locations: classpath:db/migration
+  baseline-on-migrate: true
+  baseline-version: 0
+  validate-on-migrate: true
+  out-of-order: false
 
 spring.data.mongodb:
   uri: mongodb://localhost:27017/order_read_db
