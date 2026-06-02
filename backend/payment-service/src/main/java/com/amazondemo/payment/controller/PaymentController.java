@@ -20,9 +20,10 @@ public class PaymentController {
 
     @PostMapping("/process")
     public ResponseEntity<ApiResponse<PaymentResponse>> processPayment(
-            @Valid @RequestBody PaymentRequest request) {
+            @Valid @RequestBody PaymentRequest request,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         return ResponseEntity.ok(ApiResponse.success(
-                paymentService.processPayment(request), "Payment processed"));
+                paymentService.processPayment(request, idempotencyKey), "Payment processed"));
     }
 
     @GetMapping("/order/{orderId}")

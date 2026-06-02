@@ -33,6 +33,9 @@ public class Order {
     @Column(nullable = false, unique = true)
     private String orderNumber;  // Human-readable: ORD-2024-001234
 
+    @Column(name = "idempotency_key", unique = true, length = 128)
+    private String idempotencyKey;
+
     @Column(nullable = false)
     private String userId;
 

@@ -129,7 +129,7 @@ class OrderServiceTest {
         void shouldCreateOrderWithPendingStatus() {
             when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
 
-            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL);
+            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL, "idem-key-1");
 
             assertThat(response.getStatus()).isEqualTo("PENDING");
             assertThat(response.getUserId()).isEqualTo(USER_ID);
@@ -140,7 +140,7 @@ class OrderServiceTest {
         void shouldApplyFreeShippingForLargeOrders() {
             when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
 
-            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL);
+            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL, "idem-key-2");
 
             // savedOrder has subtotal 59.98 > 50 → free shipping
             assertThat(savedOrder.getShippingCost()).isEqualByComparingTo("0.00");
@@ -151,7 +151,7 @@ class OrderServiceTest {
         void shouldSetOrderNumber() {
             when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
 
-            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL);
+            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL, "idem-key-3");
 
             assertThat(response.getOrderNumber()).startsWith("ORD-");
         }
@@ -161,7 +161,7 @@ class OrderServiceTest {
         void shouldPublishOrderPlacedKafkaEvent() {
             when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
 
-            orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL);
+            orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL, "idem-key-4");
 
             verify(kafkaTemplate).send(eq("order-events"), eq("order-001"), any());
         }
@@ -175,10 +175,22 @@ class OrderServiceTest {
 
             // Order should NOT fail if inventory is unavailable
             assertThatCode(() ->
-                orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL))
+                orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL, "idem-key-5"))
                 .doesNotThrowAnyException();
 
             verify(orderRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("Should return existing order when idempotency key is repeated")
+        void shouldReturnExistingOrderForRepeatedIdempotencyKey() {
+            when(orderRepository.findByIdempotencyKey("idem-repeat")).thenReturn(Optional.of(savedOrder));
+
+            OrderResponse response = orderService.createOrder(validOrderRequest, USER_ID, USER_EMAIL, "idem-repeat");
+
+            assertThat(response.getId()).isEqualTo("order-001");
+            verify(orderRepository, never()).save(any(Order.class));
+            verify(kafkaTemplate, never()).send(eq("order-events"), anyString(), any());
         }
     }
 

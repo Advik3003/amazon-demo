@@ -28,6 +28,9 @@ public class Payment {
     @Column(nullable = false)
     private String userId;
 
+    @Column(name = "idempotency_key", unique = true, length = 128)
+    private String idempotencyKey;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 

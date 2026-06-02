@@ -31,12 +31,13 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> createOrder(
             @Valid @RequestBody CreateOrderRequest request,
             @RequestHeader("X-User-Id") String userId,
-            @RequestHeader(value = "X-User-Email", defaultValue = "") String userEmail) {
+            @RequestHeader(value = "X-User-Email", defaultValue = "") String userEmail,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
-                        orderService.createOrder(request, userId, userEmail),
+                        orderService.createOrder(request, userId, userEmail, idempotencyKey),
                         "Order placed successfully"));
     }
 

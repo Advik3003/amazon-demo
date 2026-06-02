@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -51,8 +52,16 @@ public class OrderService {
      * Create a new order
      */
     @Transactional
-    public OrderResponse createOrder(CreateOrderRequest request, String userId, String userEmail) {
+    public OrderResponse createOrder(CreateOrderRequest request, String userId, String userEmail, String idempotencyKey) {
         log.info("Creating order for user: {}", userId);
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existing = orderRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Returning existing order for idempotency key: {}", idempotencyKey);
+                return toResponse(existing.get());
+            }
+        }
 
         // Build order items with fetched prices
         List<OrderItem> orderItems = buildOrderItems(request.getItems());
@@ -70,6 +79,7 @@ public class OrderService {
         // Create order
         Order order = Order.builder()
                 .orderNumber(generateOrderNumber())
+                .idempotencyKey(idempotencyKey)
                 .userId(userId)
                 .userEmail(userEmail)
                 .subtotal(subtotal)
@@ -119,6 +129,7 @@ public class OrderService {
      * Get a single order (only if it belongs to the user)
      */
     public OrderResponse getOrderById(String orderId, String userId) {
+        Objects.requireNonNull(orderId, "orderId must not be null");
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -135,6 +146,7 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse cancelOrder(String orderId, String userId, String reason) {
+        Objects.requireNonNull(orderId, "orderId must not be null");
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -171,6 +183,7 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse updateOrderStatus(String orderId, String status) {
+        Objects.requireNonNull(orderId, "orderId must not be null");
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
@@ -249,7 +262,7 @@ public class OrderService {
                 .eventTime(LocalDateTime.now())
                 .build();
 
-        kafkaTemplate.send(ORDER_EVENTS_TOPIC, order.getId(), event)
+        kafkaTemplate.send(ORDER_EVENTS_TOPIC, Objects.requireNonNull(order.getId()), event)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
                         log.error("Failed to publish {} event for order: {}", eventType, order.getId(), ex);

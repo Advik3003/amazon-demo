@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -50,12 +52,21 @@ public class PaymentService {
     private long processingDelayMs;
 
     @Transactional
-    public PaymentResponse processPayment(PaymentRequest request) {
+    public PaymentResponse processPayment(PaymentRequest request, String idempotencyKey) {
         log.info("Processing payment for order: {} amount: {}", request.getOrderId(), request.getAmount());
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existing = paymentRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Returning existing payment for idempotency key: {}", idempotencyKey);
+                return toResponse(existing.get());
+            }
+        }
 
         Payment payment = Payment.builder()
                 .orderId(request.getOrderId())
                 .userId(request.getUserId())
+                .idempotencyKey(idempotencyKey)
                 .amount(request.getAmount())
                 .currency(request.getCurrency() != null ? request.getCurrency() : "USD")
                 .paymentMethod(Payment.PaymentMethod.valueOf(
@@ -63,7 +74,8 @@ public class PaymentService {
                 .status(Payment.PaymentStatus.PROCESSING)
                 .build();
 
-        Payment saved = paymentRepository.save(payment);
+        Payment saved = Optional.ofNullable(paymentRepository.save(payment))
+                .orElseThrow(() -> new IllegalStateException("Failed to persist payment"));
 
         // Simulate processing delay
         try {
@@ -85,7 +97,8 @@ public class PaymentService {
             log.warn("Payment FAILED for order: {}", request.getOrderId());
         }
 
-        Payment finalPayment = paymentRepository.save(saved);
+        Payment finalPayment = Optional.ofNullable(paymentRepository.save(saved))
+                .orElseThrow(() -> new IllegalStateException("Failed to update payment state"));
 
         // Publish payment event to Kafka
         publishPaymentEvent(finalPayment, isSuccess ? "PAYMENT_SUCCESS" : "PAYMENT_FAILED");
@@ -115,7 +128,7 @@ public class PaymentService {
                 .eventTime(LocalDateTime.now())
                 .build();
 
-        kafkaTemplate.send("payment-events", payment.getOrderId(), event)
+        kafkaTemplate.send("payment-events", Objects.requireNonNull(payment.getOrderId()), event)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
                         log.error("Failed to publish payment event", ex);

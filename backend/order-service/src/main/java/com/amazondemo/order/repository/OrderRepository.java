@@ -17,6 +17,7 @@ public interface OrderRepository extends JpaRepository<Order, String> {
     Page<Order> findByUserId(String userId, Pageable pageable);
 
     Optional<Order> findByOrderNumber(String orderNumber);
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
 
     Page<Order> findByStatus(Order.OrderStatus status, Pageable pageable);
 

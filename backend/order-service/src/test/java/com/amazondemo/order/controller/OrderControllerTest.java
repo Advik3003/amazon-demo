@@ -112,7 +112,7 @@ class OrderControllerTest {
         @Test
         @DisplayName("Should return 201 when order is created successfully")
         void shouldReturn201OnOrderCreation() throws Exception {
-            when(orderService.createOrder(any(), eq(USER_ID), eq(USER_EMAIL)))
+            when(orderService.createOrder(any(), eq(USER_ID), eq(USER_EMAIL), isNull()))
                 .thenReturn(sampleOrderResponse);
 
             mockMvc.perform(post("/api/v1/orders")
@@ -144,7 +144,7 @@ class OrderControllerTest {
         @Test
         @DisplayName("Should pass X-User-Id header to service")
         void shouldPassUserIdToService() throws Exception {
-            when(orderService.createOrder(any(), eq("user-xyz"), anyString()))
+            when(orderService.createOrder(any(), eq("user-xyz"), anyString(), isNull()))
                 .thenReturn(sampleOrderResponse);
 
             mockMvc.perform(post("/api/v1/orders")
@@ -154,7 +154,7 @@ class OrderControllerTest {
                     .content(objectMapper.writeValueAsString(validRequest)))
                 .andExpect(status().isCreated());
 
-            verify(orderService).createOrder(any(), eq("user-xyz"), anyString());
+            verify(orderService).createOrder(any(), eq("user-xyz"), anyString(), isNull());
         }
     }
 

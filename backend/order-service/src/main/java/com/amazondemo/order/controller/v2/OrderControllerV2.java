@@ -44,9 +44,10 @@ public class OrderControllerV2 {
     public ResponseEntity<ApiResponse<OrderResponseV2>> createOrder(
             @Valid @RequestBody CreateOrderRequest request,
             @RequestHeader("X-User-Id") String userId,
-            @RequestHeader(value = "X-User-Email", defaultValue = "") String userEmail) {
+            @RequestHeader(value = "X-User-Email", defaultValue = "") String userEmail,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
-        OrderResponse created = orderService.createOrder(request, userId, userEmail);
+        OrderResponse created = orderService.createOrder(request, userId, userEmail, idempotencyKey);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(OrderResponseV2.fromV1(created), "Order placed successfully (v2)"));
